@@ -20,7 +20,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
   credentials: true
 }));
-
+// 🔴 Vercel Preflight Requests (OPTIONS) ko handle karne ke liye yeh lazmi add karein
+app.options('*', cors());
 // ✅ Add the routes:
 app.use("/api", employerRoutes);
 app.use("/api", candidateRoutes);
