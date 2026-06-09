@@ -9,8 +9,12 @@ const { GoogleGenAI } = require('@google/genai');
 const Candidate = require("../models/Candidate");
 const Result = require("../models/Result");
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    baseUrl: "https://generativelanguage.googleapis.com"
+  }
+});
 // ==========================
 // MULTER CONFIG
 // ==========================
@@ -240,7 +244,13 @@ router.post("/preview-ai-questions", async (req, res) => {
       config: { systemInstruction: systemInstruction, responseMimeType: "application/json" }
     });
     res.status(200).json({ success: true, questions: JSON.parse(aiResponse.text) });
-  } catch (error) { res.status(500).json({ error: "Failed to generate dynamic assessment blueprints." }); }
+  } catch (error) {
+  console.error("Gemini Error:", error);
+  res.status(500).json({
+    error: "Failed to generate dynamic assessment blueprints.",
+    details: error.message
+  });
+}
 });
 
 router.get("/specific-test/:jobId", async (req, res) => {
