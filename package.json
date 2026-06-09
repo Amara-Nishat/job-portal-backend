@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "@google/genai": "^2.8.0",
+    "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",

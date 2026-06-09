@@ -5,11 +5,12 @@ const Job = require("../models/Job");
 const SavedJob = require("../models/SavedJob");
 const multer = require("multer");
 const mongoose = require("mongoose");
-const { GoogleGenAI } = require('@google/genai'); 
+ 
 const Candidate = require("../models/Candidate");
 const Result = require("../models/Result");
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // ==========================
 // MULTER CONFIG
@@ -229,20 +230,121 @@ router.get("/company-applicants/:companyEmail", async (req, res) => {
 // ==========================================
 // 🔥 OTHERS RETAINED CLEANLY FOR PLATFORM
 // ==========================================
+// ==========================
+// 🔥 GEMINI MCQ GENERATOR (FIXED)
+// ==========================
 router.post("/preview-ai-questions", async (req, res) => {
   try {
-    const { aiPrompt } = req.body;
-    if (!aiPrompt || aiPrompt.trim() === "") return res.status(400).json({ error: "Prompt is required" });
-    const systemInstruction = `You are an expert technical interviewer. Return exactly 10 MCQs strictly as a JSON array of objects. Fields required: "question", "options", "correctAnswer".`;
-    const aiResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Generate exactly 10 assessment MCQs for: ${aiPrompt}`,
-      config: { systemInstruction: systemInstruction, responseMimeType: "application/json" }
-    });
-    res.status(200).json({ success: true, questions: JSON.parse(aiResponse.text) });
-  } catch (error) { res.status(500).json({ error: "Failed to generate dynamic assessment blueprints." }); }
-});
+    console.log("REQUEST BODY:", req.body);
 
+    const { aiPrompt } = req.body;
+
+    if (!aiPrompt || aiPrompt.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        error: "aiPrompt is required"
+      });
+    }
+
+    console.log("PROMPT:", aiPrompt);
+    console.log("API KEY EXISTS:", !!process.env.GEMINI_API_KEY);
+
+    // ✅ Correct SDK import (top of your file mein yeh hona chahiye)
+    // const { GoogleGenerativeAI } = require("@google/generative-ai");
+    // const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+    const systemInstruction = `
+You are an expert MCQ generator for technical hiring tests.
+STRICT RULES:
+- Return ONLY valid JSON array
+- No markdown, no explanation, no extra text
+- Return an array of exactly 10 MCQs in this exact format:
+[
+  {
+    "question": "string",
+    "options": ["string", "string", "string", "string"],
+    "correctAnswer": "string"
+  }
+]
+- options must always have exactly 4 items
+- correctAnswer must exactly match one of the options
+- questions must be technical and relevant to the job role
+`;
+
+    // ✅ CORRECT SDK SYNTAX for @google/generative-ai
+    const model = genai.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemInstruction,
+    });
+
+    const result = await model.generateContent(
+      `Generate 10 MCQs for this topic: ${aiPrompt}. Return ONLY a valid JSON array, no markdown, no backticks.`
+    );
+
+    console.log("RAW RESULT:", result);
+
+    // ✅ Correct text extraction
+    const text = result.response.text();
+
+    console.log("AI TEXT:", text);
+
+    if (!text || text.trim() === "") {
+      return res.status(500).json({
+        success: false,
+        error: "Empty response from AI"
+      });
+    }
+
+    // ✅ Clean markdown backticks agar AI ne diye toh bhi handle ho
+    const cleanedText = text
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
+
+    console.log("CLEANED TEXT:", cleanedText);
+
+    // ✅ Safe JSON parse
+    let parsedQuestions;
+    try {
+      parsedQuestions = JSON.parse(cleanedText);
+    } catch (err) {
+      console.error("JSON PARSE ERROR:", err.message);
+      console.log("INVALID RAW OUTPUT:", cleanedText);
+
+      return res.status(500).json({
+        success: false,
+        error: "AI returned invalid JSON",
+        raw: cleanedText
+      });
+    }
+
+    // ✅ Validate structure
+    if (!Array.isArray(parsedQuestions)) {
+      return res.status(500).json({
+        success: false,
+        error: "AI response is not an array",
+        raw: cleanedText
+      });
+    }
+
+    // ✅ Final response
+    return res.status(200).json({
+      success: true,
+      questions: parsedQuestions
+    });
+
+  } catch (error) {
+    console.error("GEMINI API CRASH:", error);
+    console.error("ERROR NAME:", error.name);
+    console.error("ERROR MESSAGE:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Internal server error",
+      hint: "Check Railway logs for GEMINI_API_KEY and SDK errors"
+    });
+  }
+});
 router.get("/specific-test/:jobId", async (req, res) => {
   try {
     const { jobId } = req.params;
