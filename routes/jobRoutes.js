@@ -370,6 +370,18 @@ router.get("/applied-jobs/:email", async (req, res) => {
     res.status(500).json({ msg: "Error fetching components applications payload framework" });
   }
 });
+router.get("/test-gemini", async (req, res) => {
+  try {
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: "Hello"
+    });
 
+    res.json(result.text);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json(e.message);
+  }
+});
 
 module.exports = router;
