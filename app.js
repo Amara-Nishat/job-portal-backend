@@ -42,11 +42,14 @@ mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI)
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // 🔴 LOCAL DEVELOPMENT CONTROL (Live par app.listen nahi chalta)
-if (process.env.NODE_ENV !== 'production') {
-  const port = process.env.PORT || 5000;
-  app.listen(port, () => console.log(`✅ Server running on port ${port}`));
-}
+// ✅ RAILWAY & LOCAL BOTH SUPPORTED (Ab yeh live par bhi listen karega)
+const port = process.env.PORT || 5000;
+app.listen(port, () => console.log(`✅ Server running on port ${port}`));
 
+console.log('JWT_SECRET at startup:', process.env.JWT_SECRET);
+
+// Isay aap bhale aise hi rehne dein, koi masla nahi hai
+module.exports = app;
 console.log('JWT_SECRET at startup:', process.env.JWT_SECRET);
 
 // 🔴 VERCEL REQUIRED EXPORT: Is file ke bilkul end par yeh hona lazmi hai
